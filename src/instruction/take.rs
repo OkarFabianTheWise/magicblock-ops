@@ -18,6 +18,12 @@ pub fn process_take(accounts: &[AccountInfo]) -> ProgramResult {
     let escrow_account =
         unsafe { load_acc_mut_unchecked::<Escrow>(escrow.borrow_mut_data_unchecked())? };
 
+    /*
+    let escrow_account = *bytemuck::try_from_bytes::<Escrow>(escrow.borrow_mut_data_unchecked())
+        .map_err(|_| ProgramError::AccountBorrowFailed)?;
+
+    */
+
     //do we need this? do we need to pass mint_a and mint_b? Isnt the CPI checking this?
     assert_eq!(escrow_account.mint_a, *mint_a.key());
     assert_eq!(escrow_account.mint_b, *mint_b.key());
