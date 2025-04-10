@@ -6,9 +6,13 @@ use pinocchio::{
     sysvars::{rent::Rent, Sysvar},
     ProgramResult,
 };
+use pinocchio_log::log;
 use pinocchio_token::state::TokenAccount;
 
-use crate::state::{DataLen, Escrow};
+use crate::{
+    error::MyProgramError,
+    state::{DataLen, Escrow},
+};
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
@@ -25,37 +29,46 @@ pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    if data.len() < core::mem::size_of::<MakeEscrowIx>() {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-
-    let ix_data: &MakeEscrowIx = bytemuck::from_bytes(data);
     /*
+     if data.len() < core::mem::size_of::<MakeEscrowIx>() {
+         return Err(ProgramError::InvalidInstructionData);
+     }
+
+     let ix_data: &MakeEscrowIx = from_bytes(data);
+    */
 
     //without bytemuck and raw pointers:
-
+    if data.len() < 17 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
     let bump = data[0];
-    let amount_a = u64::from_le_bytes(data[1..9].try_into().unwrap());
-    let amount_b = data[9..17].try_into().unwrap();
+    let amount_a = u64::from_le_bytes(
+        data[1..9]
+            .try_into()
+            .map_err(|_| MyProgramError::DeserializationFailed)?,
+    );
+    let amount_b = data[9..17]
+        .try_into()
+        .map_err(|_| MyProgramError::DeserializationFailed)?;
 
-     */
+    let seeds = &["escrow".as_bytes(), maker.key().as_ref()];
 
-    let seed = [(b"escrow"), maker.key().as_slice(), &[ix_data.bump]];
-    let seeds = &seed[..];
+    let (pda, bump_1) =
+        pubkey::try_find_program_address(seeds, &crate::ID).ok_or(ProgramError::InvalidSeeds)?;
 
-    let pda = pubkey::checked_create_program_address(seeds, &crate::ID).unwrap();
+    log!("bomp {}", bump_1);
     assert_eq!(&pda, escrow.key());
 
     //is escrow the vault onwer?
     assert!(unsafe {
         TokenAccount::from_account_info_unchecked(vault)
-            .unwrap()
+            .map_err(|_| MyProgramError::DeserializationFailed)?
             .owner()
             == escrow.key()
     });
 
-    //has the escrow bee initialized?
-    if unsafe { escrow.owner() } != &crate::ID {
+    //has the escrow bee initialized? - check or lamports and data
+    if unsafe { escrow.owner() } == &crate::ID {
         return Err(ProgramError::AccountAlreadyInitialized);
     }
 
@@ -75,15 +88,15 @@ pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         *maker.key(),
         *mint_a.key(),
         *mint_b.key(),
-        ix_data.amount_b,
-        ix_data.bump,
+        amount_b,
+        bump_1,
     );
 
     pinocchio_token::instructions::Transfer {
         from: maker_ata,
         to: vault,
         authority: maker,
-        amount: u64::from_le_bytes(ix_data.amount_a),
+        amount: amount_a,
     }
     .invoke()?;
 
