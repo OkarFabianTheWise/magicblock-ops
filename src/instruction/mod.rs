@@ -1,7 +1,9 @@
 pub mod make;
+pub mod refund;
 pub mod take;
 
 pub use make::*;
+pub use refund::*;
 pub use take::*;
 
 use pinocchio::program_error::ProgramError;
@@ -10,6 +12,7 @@ use pinocchio::program_error::ProgramError;
 pub enum MyProgramInstrution {
     Make,
     Take,
+    Refund,
 }
 
 impl TryFrom<&u8> for MyProgramInstrution {
@@ -19,6 +22,7 @@ impl TryFrom<&u8> for MyProgramInstrution {
         match *value {
             0 => Ok(MyProgramInstrution::Make),
             1 => Ok(MyProgramInstrution::Take),
+            2 => Ok(MyProgramInstrution::Refund),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }
