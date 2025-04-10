@@ -1,3 +1,4 @@
+use bytemuck::{from_bytes, Pod, Zeroable};
 use pinocchio::{
     account_info::AccountInfo,
     program_error::ProgramError,
@@ -9,6 +10,14 @@ use pinocchio_token::state::TokenAccount;
 
 use crate::state::{DataLen, Escrow};
 
+#[repr(C)]
+#[derive(Clone, Copy, Zeroable, Pod)]
+pub struct MakeEscrowIx {
+    pub bump: u8,
+    pub amount_a: [u8; 8],
+    pub amount_b: [u8; 8],
+}
+
 pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let [maker, mint_a, mint_b, maker_ata, vault, escrow, _system_program, _token_program] =
         accounts
@@ -16,11 +25,22 @@ pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
-    //bytemuck here?
-    let bump = unsafe { *(data.as_ptr() as *const u8) };
-    let amount = unsafe { *(data.as_ptr().add(1 + 8) as *const u64) }.to_be_bytes();
+    if data.len() < core::mem::size_of::<MakeEscrowIx>() {
+        return Err(ProgramError::InvalidInstructionData);
+    }
 
-    let seed = [(b"escrow"), maker.key().as_slice(), &[bump]];
+    let ix_data: &MakeEscrowIx = bytemuck::from_bytes(data);
+    /*
+
+    //without bytemuck and raw pointers:
+
+    let bump = data[0];
+    let amount_a = u64::from_le_bytes(data[1..9].try_into().unwrap());
+    let amount_b = data[9..17].try_into().unwrap();
+
+     */
+
+    let seed = [(b"escrow"), maker.key().as_slice(), &[ix_data.bump]];
     let seeds = &seed[..];
 
     let pda = pubkey::checked_create_program_address(seeds, &crate::ID).unwrap();
@@ -55,15 +75,15 @@ pub fn process_make(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
         *maker.key(),
         *mint_a.key(),
         *mint_b.key(),
-        amount,
-        bump,
+        ix_data.amount_b,
+        ix_data.bump,
     );
 
     pinocchio_token::instructions::Transfer {
         from: maker_ata,
         to: vault,
         authority: maker,
-        amount: u64::from_le_bytes(amount),
+        amount: u64::from_le_bytes(ix_data.amount_a),
     }
     .invoke()?;
 

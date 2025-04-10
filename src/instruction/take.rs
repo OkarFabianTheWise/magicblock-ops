@@ -1,11 +1,15 @@
 use pinocchio::{
     account_info::AccountInfo,
     instruction::{Seed, Signer},
+    program_error::ProgramError,
     pubkey::find_program_address,
     ProgramResult,
 };
 
-use crate::state::{load_acc_mut_unchecked, Escrow};
+use crate::{
+    error::MyProgramError,
+    state::{load_acc_mut_unchecked, Escrow},
+};
 
 pub fn process_take(accounts: &[AccountInfo]) -> ProgramResult {
     let [taker, maker, mint_a, mint_b, taker_ata_a, taker_ata_b, maker_ata_b, vault, escrow, _token_program, _system_program] =
@@ -15,12 +19,17 @@ pub fn process_take(accounts: &[AccountInfo]) -> ProgramResult {
     };
 
     //here is where we could use bytemuck
-    let escrow_account =
-        unsafe { load_acc_mut_unchecked::<Escrow>(escrow.borrow_mut_data_unchecked())? };
 
-    /*
-    let escrow_account = *bytemuck::try_from_bytes::<Escrow>(escrow.borrow_mut_data_unchecked())
+    //try to load escrow data:
+    let escrow_data = escrow
+        .try_borrow_data()
         .map_err(|_| ProgramError::AccountBorrowFailed)?;
+    let escrow_account = bytemuck::try_from_bytes::<Escrow>(&escrow_data)
+        .map_err(|_| MyProgramError::DeserializationFailed)?;
+    ();
+    /*
+        let escrow_account =
+        unsafe { load_acc_mut_unchecked::<Escrow>(escrow.borrow_mut_data_unchecked())? };
 
     */
 

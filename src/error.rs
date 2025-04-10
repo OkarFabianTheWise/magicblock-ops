@@ -12,6 +12,8 @@ pub enum MyProgramError {
     InvalidOwner,
     // Not a system account
     InvalidAccount,
+    //Unable to Deserialize
+    DeserializationFailed,
 }
 
 impl From<MyProgramError> for ProgramError {
