@@ -1,7 +1,9 @@
+pub mod delegate;
 pub mod make;
 pub mod refund;
 pub mod take;
 
+pub use delegate::*;
 pub use make::*;
 pub use refund::*;
 pub use take::*;
@@ -13,6 +15,7 @@ pub enum MyProgramInstrution {
     Make,
     Take,
     Refund,
+    Delegate,
 }
 
 impl TryFrom<&u8> for MyProgramInstrution {
@@ -23,6 +26,7 @@ impl TryFrom<&u8> for MyProgramInstrution {
             0 => Ok(MyProgramInstrution::Make),
             1 => Ok(MyProgramInstrution::Take),
             2 => Ok(MyProgramInstrution::Refund),
+            3 => Ok(MyProgramInstrution::Delegate),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }

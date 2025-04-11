@@ -14,6 +14,7 @@ pub enum MyProgramError {
     InvalidAccount,
     //Unable to Deserialize
     DeserializationFailed,
+    FailedRealloc,
 }
 
 impl From<MyProgramError> for ProgramError {
