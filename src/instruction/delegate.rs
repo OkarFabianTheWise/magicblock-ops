@@ -120,7 +120,18 @@ pub fn process_delegate(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
         AccountMeta::readonly(system_program.key()),
     ];
 
-    //TODO get MOCK DATA from github
+    //args are the DelegateAccountArgs serialized
+
+    //preprare delegate args
+    let seeds_vec: Vec<Vec<u8>> = escrow_seeds.iter().map(|&slice| slice.to_vec()).collect();
+
+    let delegate_args = DelegateAccountArgs {
+        commit_frequency_ms: 30_000,
+        seeds: seeds_vec,
+        validator: None,
+    };
+
+    //seriliaze the args
     let mut data: Vec<u8> = vec![0u8; 8];
     let serialized_seeds = args.try_to_vec()?;
     data.extend_from_slice(&serialized_seeds);
@@ -142,6 +153,6 @@ pub fn process_delegate(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
         system_program,
     ];
 
-    invoke_signed(&instruction, &acc_infos, signers);
+    invoke_signed(&instruction, &acc_infos, &[pda_signer_seeds]);
     Ok(())
 }
