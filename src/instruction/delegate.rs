@@ -2,7 +2,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use bytemuck::{from_bytes, Pod, Zeroable};
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{AccountMeta, Seed, Signer},
+    cpi::invoke_signed,
+    instruction::{AccountMeta, Instruction, Seed, Signer},
     program_error::ProgramError,
     pubkey::{self, Pubkey},
     sysvars::{rent::Rent, Sysvar},
@@ -35,7 +36,9 @@ pub const DELEGATION_ACCOUNT: Pubkey =
     pinocchio_pubkey::pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
 
 pub fn process_delegate(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    let [maker, pda_acc, magic_acc, buffer_acc, delegation_record, delegation_metadata, system_program] = accounts else {
+    let [maker, pda_acc, magic_acc, buffer_acc, delegation_record, delegation_metadata, system_program] =
+        accounts
+    else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
 
@@ -107,32 +110,38 @@ pub fn process_delegate(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
     }
     .invoke_signed(&[buffer_signer_seeds])?;
 
-
-
-  //TODO - Arrange Accounts
-    let acc_vec = vec![
-      AccountMeta::new(maker.key(), true, true),
-      AccountMeta::new(pda_acc.key(), true, false),
-      AccountMeta::readonly(&crate::ID, false),
-      AccountMeta::new(buffer_acc.key(), false, false),
-      AccountMeta::new(*delegation_record.key, false),
-      AccountMeta::new(*delegation_metadata.key, false),
-      AccountMeta::readonly(system_program.key()),
+    let account_metas = vec![
+        AccountMeta::new(maker.key(), true, true),
+        AccountMeta::new(pda_acc.key(), true, false),
+        AccountMeta::readonly(&crate::ID),
+        AccountMeta::new(buffer_acc.key(), false, false),
+        AccountMeta::new(delegation_record.key(), true, false),
+        AccountMeta::readonly(delegation_metadata.key()),
+        AccountMeta::readonly(system_program.key()),
     ];
-
 
     //TODO get MOCK DATA from github
     let mut data: Vec<u8> = vec![0u8; 8];
     let serialized_seeds = args.try_to_vec()?;
     data.extend_from_slice(&serialized_seeds);
-    
+
     //call Instruction
     let instruction = Instruction {
-      program_id: &DELEGATION_ACCOUNT,
-      accounts: &account_metas,
-      data: &data,
-  };
+        program_id: &DELEGATION_ACCOUNT,
+        accounts: &account_metas,
+        data: &data,
+    };
 
-  invoke_signed(&instruction, &[self.from, self.to], signers)
+    let acc_infos = [
+        maker,
+        pda_acc,
+        magic_acc,
+        buffer_acc,
+        delegation_record,
+        delegation_metadata,
+        system_program,
+    ];
+
+    invoke_signed(&instruction, &acc_infos, signers);
     Ok(())
 }
