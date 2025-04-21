@@ -27,5 +27,8 @@ fn process_instruction(
         MyProgramInstrution::Take => instruction::process_take(accounts),
         MyProgramInstrution::Refund => instruction::process_refund(accounts),
         MyProgramInstrution::Delegate => instruction::process_delegate(accounts, instruction_data),
+        MyProgramInstrution::UnDelegate => {
+            instruction::process_undelegate(accounts, instruction_data)
+        }
     }
 }

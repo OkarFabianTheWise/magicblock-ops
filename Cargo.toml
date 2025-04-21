@@ -12,8 +12,8 @@ pinocchio-log = "0.4.0"
 pinocchio-pubkey = "0.2.4"
 pinocchio-system = "0.2.3"
 pinocchio-token = "0.3.0"
-bytemuck = { version = "1.19.0", features = ["derive" , "const_zeroed"] }
-borsh = "1.5.7"
+bytemuck = { version = "1.19.0", features = ["derive", "const_zeroed"] }
+borsh = { version = "1.5.7", features = ["borsh-derive", "derive"] }
 
 [dev-dependencies]
 solana-sdk = "2.1.0"
@@ -25,5 +25,3 @@ spl-token = "8.0.0"
 no-entrypoint = []
 std = []
 test-default = ["no-entrypoint", "std"]
-
-

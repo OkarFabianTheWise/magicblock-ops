@@ -22,6 +22,7 @@ mod tests {
     use spl_token::state::AccountState;
 
     const ID: Pubkey = pubkey!("A24MN2mj3aBpDLRhY6FonnbTuayv7oRqhva2R2hUuyqx");
+    const DELEGATION_ACCOUNT: Pubkey = pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
 
     #[test]
     fn test_make() {
@@ -222,5 +223,136 @@ mod tests {
             mint_x_account.data_as_mut_slice(),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_delegate() {
+        let mut mollusk = Mollusk::new(&ID, "target/deploy/pinocchio_3");
+
+        let (system_program, system_account) =
+            mollusk_svm::program::keyed_account_for_system_program();
+
+        // Setup maker account
+        let maker = Pubkey::new_from_array([0x02; 32]);
+        let maker_account = Account::new(1 * LAMPORTS_PER_SOL, 0, &system_program);
+
+        // Setup PDA account
+        let (escrow, escrow_bump) = solana_sdk::pubkey::Pubkey::find_program_address(
+            &[(b"escrow"), &maker.to_bytes()],
+            &ID,
+        );
+        let mut escrow_account = Account::new(mollusk.sysvars.rent.minimum_balance(100), 100, &ID);
+        // Add some test data to escrow
+        escrow_account.data_mut()[0] = 42;
+
+        // Setup buffer account
+        let (buffer, buffer_bump) =
+            solana_sdk::pubkey::Pubkey::find_program_address(&[(b"buffer"), escrow.as_ref()], &ID);
+        let buffer_account = Account::new(0, 0, &system_program);
+
+        // Setup delegation accounts
+        let delegation_record = Pubkey::new_from_array([0x07; 32]);
+        let delegation_record_account = Account::new(0, 0, &system_program);
+
+        let delegation_metadata = Pubkey::new_from_array([0x08; 32]);
+        let delegation_metadata_account = Account::new(0, 0, &system_program);
+
+        let magic_program = ID;
+
+        let instruction = Instruction::new_with_bytes(
+            ID,
+            &[1], // Delegate instruction
+            vec![
+                AccountMeta::new(maker, true),
+                AccountMeta::new(escrow, false),
+                AccountMeta::new_readonly(magic_program, false),
+                AccountMeta::new(buffer, false),
+                AccountMeta::new(delegation_record, false),
+                AccountMeta::new_readonly(delegation_metadata, false),
+                AccountMeta::new_readonly(system_program, false),
+            ],
+        );
+
+        mollusk.process_and_validate_instruction(
+            &instruction,
+            &vec![
+                (maker, maker_account.clone()),
+                (escrow, escrow_account),
+                (magic_program, Account::default()),
+                (buffer, buffer_account),
+                (delegation_record, delegation_record_account),
+                (delegation_metadata, delegation_metadata_account),
+                (system_program, system_account.clone()),
+            ],
+            &[Check::success()],
+        );
+    }
+
+    #[test]
+    fn test_undelegate() {
+        let mut mollusk = Mollusk::new(&ID, "target/deploy/pinocchio_3");
+
+        let (system_program, system_account) =
+            mollusk_svm::program::keyed_account_for_system_program();
+
+        // Setup maker account
+        let maker = Pubkey::new_from_array([0x02; 32]);
+        let maker_account = Account::new(1 * LAMPORTS_PER_SOL, 0, &system_program);
+
+        // Setup delegated PDA account
+        let (escrow, escrow_bump) = solana_sdk::pubkey::Pubkey::find_program_address(
+            &[(b"escrow"), &maker.to_bytes()],
+            &ID,
+        );
+        let escrow_account = Account::new(
+            mollusk.sysvars.rent.minimum_balance(100),
+            100,
+            &DELEGATION_ACCOUNT, // Note: owned by delegation program
+        );
+
+        // Setup buffer account with stored data
+        let (buffer, buffer_bump) =
+            solana_sdk::pubkey::Pubkey::find_program_address(&[(b"buffer"), escrow.as_ref()], &ID);
+        let mut buffer_account = Account::new(mollusk.sysvars.rent.minimum_balance(100), 100, &ID);
+        // Add original data to buffer
+        buffer_account.data_mut()[0] = 42;
+
+        // Setup delegation accounts
+        let delegation_record = Pubkey::new_from_array([0x07; 32]);
+        let delegation_record_account = Account::new(0, 0, &system_program);
+
+        let delegation_metadata = Pubkey::new_from_array([0x08; 32]);
+        let delegation_metadata_account = Account::new(0, 0, &system_program);
+
+        let instruction = Instruction::new_with_bytes(
+            ID,
+            &[2], // Undelegate instruction
+            vec![
+                AccountMeta::new(maker, true),
+                AccountMeta::new(escrow, false),
+                AccountMeta::new(buffer, false),
+                AccountMeta::new(delegation_record, false),
+                AccountMeta::new_readonly(delegation_metadata, false),
+                AccountMeta::new_readonly(system_program, false),
+            ],
+        );
+
+        mollusk.process_and_validate_instruction(
+            &instruction,
+            &vec![
+                (maker, maker_account.clone()),
+                (escrow, escrow_account),
+                (magic_program, Account::default()),
+                (buffer, buffer_account),
+                (delegation_record, delegation_record_account),
+                (delegation_metadata, delegation_metadata_account),
+                (system_program, system_account.clone()),
+            ],
+            &[
+                Check::success(),
+                Check::account_owner(escrow, &DELEGATION_ACCOUNT),
+                Check::account_data_len(buffer, 100),
+            ],
+        );
     }
 }

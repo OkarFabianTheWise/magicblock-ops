@@ -2,11 +2,13 @@ pub mod delegate;
 pub mod make;
 pub mod refund;
 pub mod take;
+pub mod undelegate;
 
 pub use delegate::*;
 pub use make::*;
 pub use refund::*;
 pub use take::*;
+pub use undelegate::*;
 
 use pinocchio::program_error::ProgramError;
 
@@ -16,6 +18,7 @@ pub enum MyProgramInstrution {
     Take,
     Refund,
     Delegate,
+    UnDelegate,
 }
 
 impl TryFrom<&u8> for MyProgramInstrution {
@@ -27,6 +30,7 @@ impl TryFrom<&u8> for MyProgramInstrution {
             1 => Ok(MyProgramInstrution::Take),
             2 => Ok(MyProgramInstrution::Refund),
             3 => Ok(MyProgramInstrution::Delegate),
+            3 => Ok(MyProgramInstrution::UnDelegate),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }
